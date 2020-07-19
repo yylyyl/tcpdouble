@@ -80,11 +80,19 @@ func handlePacket(packet gopacket.Packet) {
 		return
 	}
 
+	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp := tcpLayer.(*layers.TCP)
+		tcp.SetNetworkLayerForChecksum(ip4)
+	}
+
+	ip4.Checksum = 0
 	sendCh <- packet
 }
 
 func sender() {
-	opts := gopacket.SerializeOptions{}
+	opts := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+	}
 
 	for pkt := range sendCh {
 		buf := gopacket.NewSerializeBuffer()
@@ -96,6 +104,7 @@ func sender() {
 
 		b := buf.Bytes()
 		err = handle.WritePacketData(b)
+		// log.Println("send", len(b))
 		if err != nil {
 			log.Println("send error:", err)
 		}
